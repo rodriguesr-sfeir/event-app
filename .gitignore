@@ -29,3 +29,6 @@ Thumbs.db
 logs/
 *.log
 npm-debug.log*
+
+# VS Code History
+.history/
