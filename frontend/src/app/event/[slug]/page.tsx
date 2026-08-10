@@ -16,6 +16,15 @@ interface Event {
   custom_message?: string;
 }
 
+interface Photo {
+  id: string;
+  guest_name: string;
+  guest_description: string;
+  processed_image_path: string;
+  is_visible: boolean;
+  created_at: string;
+}
+
 interface UploadStatus {
   fileName: string;
   progress: number;
@@ -23,13 +32,21 @@ interface UploadStatus {
   error?: string;
 }
 
+type TabType = 'gallery' | 'upload';
+type SortOption = 'recent' | 'old' | 'liked' | 'name';
+
 export default function EventPage() {
   const params = useParams();
   const slug = params.slug as string;
 
   const [event, setEvent] = useState<Event | null>(null);
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [filteredPhotos, setFilteredPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [tab, setTab] = useState<TabType>('gallery');
+  const [sortBy, setSortBy] = useState<SortOption>('recent');
+  const [refreshing, setRefreshing] = useState(false);
 
   // Upload states
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -38,6 +55,13 @@ export default function EventPage() {
   const [uploadStatuses, setUploadStatuses] = useState<UploadStatus[]>([]);
   const [successMessage, setSuccessMessage] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+
+  // Lightbox
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+
+  // Likes
+  const [likedPhotos, setLikedPhotos] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (slug) {
@@ -53,6 +77,7 @@ export default function EventPage() {
 
       if (response.data.success) {
         setEvent(response.data.data);
+        await fetchPhotos(eventSlug);
         setError('');
       } else {
         setError(response.data.error || 'Événement non trouvé');
@@ -64,6 +89,62 @@ export default function EventPage() {
       setLoading(false);
     }
   };
+
+  const fetchPhotos = async (eventSlug: string) => {
+    try {
+      const response = await axios.get(
+        `http://localhost:5000/api/guest/${eventSlug}/photos`
+      );
+
+      if (response.data.success) {
+        setPhotos(response.data.data || []);
+      }
+    } catch (error) {
+      console.error('Erreur chargement photos', error);
+    }
+  };
+
+  // Trier les photos selon le critère sélectionné
+  useEffect(() => {
+    let sorted = [...photos];
+
+    switch (sortBy) {
+      case 'recent':
+        sorted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        break;
+      case 'old':
+        sorted.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        break;
+      case 'liked':
+        sorted.sort((a, b) => {
+          const aLikes = likedPhotos.has(a.id) ? 1 : 0;
+          const bLikes = likedPhotos.has(b.id) ? 1 : 0;
+          return bLikes - aLikes;
+        });
+        break;
+      case 'name':
+        sorted.sort((a, b) => (a.guest_name || '').localeCompare(b.guest_name || ''));
+        break;
+      default:
+        break;
+    }
+
+    setFilteredPhotos(sorted);
+  }, [photos, sortBy, likedPhotos]);
+
+  // Keyboard navigation pour la lightbox
+  useEffect(() => {
+    if (!lightboxOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') prevPhoto();
+      if (e.key === 'ArrowRight') nextPhoto();
+      if (e.key === 'Escape') closeLightbox();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [lightboxOpen, lightboxIndex]);
 
   // Auto-dismiss success message après 5 secondes
   useEffect(() => {
@@ -182,27 +263,66 @@ export default function EventPage() {
         setDescription('');
         setUploadStatuses([]);
         setIsUploading(false);
+        fetchEvent(slug);
       }, 5000);
     } else {
       setIsUploading(false);
     }
   };
 
-  const getEventTypeEmoji = (type: string) => {
-    const emojis: { [key: string]: string } = {
-      wedding: '💍',
-      birthday: '🎂',
-      corporate: '💼',
-      festival: '🎪',
-      party: '🎉',
-      other: '📌'
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchPhotos(slug);
+    setRefreshing(false);
+  };
+
+  const toggleLike = (photoId: string) => {
+    const newLiked = new Set(likedPhotos);
+    if (newLiked.has(photoId)) {
+      newLiked.delete(photoId);
+    } else {
+      newLiked.add(photoId);
+    }
+    setLikedPhotos(newLiked);
+  };
+
+  const copyPhotoLink = (photoId: string) => {
+    navigator.clipboard.writeText(`${window.location.origin}/event/${slug}?photoId=${photoId}`);
+    alert('✓ Lien copié !');
+  };
+
+  const getEventTypeLabel = (type: string) => {
+    const labels: { [key: string]: string } = {
+      wedding: 'Mariage',
+      birthday: 'Anniversaire',
+      corporate: 'Professionnel',
+      festival: 'Festival',
+      party: 'Fête',
+      other: 'Autre'
     };
-    return emojis[type] || '📌';
+    return labels[type] || type;
+  };
+
+  const openLightbox = (index: number) => {
+    setLightboxIndex(index);
+    setLightboxOpen(true);
+  };
+
+  const closeLightbox = () => {
+    setLightboxOpen(false);
+  };
+
+  const nextPhoto = () => {
+    setLightboxIndex((prev) => (prev + 1) % filteredPhotos.length);
+  };
+
+  const prevPhoto = () => {
+    setLightboxIndex((prev) => (prev - 1 + filteredPhotos.length) % filteredPhotos.length);
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <p className="text-slate-600">Chargement de l'événement...</p>
       </div>
     );
@@ -210,10 +330,10 @@ export default function EventPage() {
 
   if (error || !event) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
           <p className="text-slate-600 mb-4">❌ {error || 'Événement non trouvé'}</p>
-          <Link href="/" className="text-blue-600 hover:text-blue-700">
+          <Link href="/" className="text-slate-900 font-semibold hover:underline">
             Retour à l'accueil
           </Link>
         </div>
@@ -222,28 +342,28 @@ export default function EventPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-slate-50">
       {/* Navigation */}
-      <nav className="border-b border-slate-200">
-        <div className="max-w-6xl mx-auto px-6 py-4">
+      <nav className="bg-white border-b border-slate-200">
+        <div className="max-w-6xl mx-auto px-8 py-4">
           <Link href="/">
-            <img src="/images/logo.png" alt="Epik Events" className="h-18 w-auto" />
+            <img src="/images/logo.png" alt="Epik Events" className="h-12 w-auto" />
           </Link>
         </div>
       </nav>
 
       {/* Event Header */}
-      <div className="bg-gradient-to-b from-slate-50 to-white border-b border-slate-200">
-        <div className="max-w-4xl mx-auto px-6 py-12">
-          <div className="flex items-center gap-3 mb-4">
-            <span className="text-4xl">{getEventTypeEmoji(event.eventType)}</span>
-            <h1 className="text-5xl font-bold text-slate-900">{event.title}</h1>
-          </div>
+      <div className="bg-white border-b border-slate-200">
+        <div className="max-w-6xl mx-auto px-8 py-12">
+          <h1 className="text-4xl font-bold text-slate-900 mb-2">{event.title}</h1>
+          <p className="text-slate-600 mb-6">{getEventTypeLabel(event.eventType)}</p>
 
           {/* Event Details */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div className="flex items-center gap-2 text-slate-600">
-              <span>📅</span>
+              <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
               <p>
                 {new Date(event.eventDate).toLocaleDateString('fr-FR', {
                   weekday: 'long',
@@ -254,194 +374,431 @@ export default function EventPage() {
               </p>
             </div>
             <div className="flex items-center gap-2 text-slate-600">
-              <span>📍</span>
+              <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
               <p>{event.location}</p>
             </div>
           </div>
 
           {/* Custom Message */}
-          {event.custom_message && (
+          {event.custom_message ? (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-blue-900">{event.custom_message}</p>
+              <p className="text-blue-900 text-sm">{event.custom_message}</p>
             </div>
-          )}
-          {!event.custom_message && (
+          ) : (
             <div className="bg-slate-50 border border-slate-200 rounded-lg p-6">
-              <p className="text-slate-900">
-                <strong>Bienvenue ! 🎉</strong>
-              </p>
-              <p className="text-slate-600 mt-2">
-                Partagez vos photos et vidéos de cet événement. En quelques secondes, elles
-                seront visibles par tous les autres invités.
+              <p className="text-slate-900 font-medium mb-2">Bienvenue ! 👋</p>
+              <p className="text-slate-600 text-sm">
+                Partagez vos photos et vidéos de cet événement. En quelques secondes, elles seront visibles par tous les autres invités.
               </p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-4xl mx-auto px-6 py-12">
+      {/* Content */}
+      <div className="max-w-6xl mx-auto px-8 py-8">
+        {/* Tab Navigation */}
+        <div className="bg-white rounded-lg border border-slate-200 mb-8 overflow-hidden">
+          <div className="flex gap-0">
+            <button
+              onClick={() => setTab('gallery')}
+              className={`flex-1 px-6 py-4 text-sm font-medium border-b-2 transition ${
+                tab === 'gallery'
+                  ? 'border-slate-900 text-slate-900 bg-slate-50'
+                  : 'border-transparent text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Galerie ({photos.length})
+            </button>
+            <button
+              onClick={() => setTab('upload')}
+              className={`flex-1 px-6 py-4 text-sm font-medium border-b-2 transition ${
+                tab === 'upload'
+                  ? 'border-slate-900 text-slate-900 bg-slate-50'
+                  : 'border-transparent text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Charger des photos
+            </button>
+          </div>
+        </div>
+
         {/* Success Message */}
         {successMessage && (
           <div className="mb-8">
-            <div className="bg-green-50 border border-green-200 text-green-900 p-4 rounded-lg text-center font-semibold animate-pulse">
+            <div className="bg-green-50 border border-green-200 text-green-900 p-4 rounded-lg text-center font-semibold text-sm">
               ✓ {successMessage}
             </div>
           </div>
         )}
 
-        {/* Upload Form */}
-        <div className="mb-12">
-          <h2 className="text-2xl font-bold text-slate-900 mb-6">Uploadez vos photos</h2>
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Guest Name */}
-            <div>
-              <label className="block mb-3 text-sm font-medium text-slate-900">
-                Votre nom/prénom *
-              </label>
-              <input
-                type="text"
-                value={guestName}
-                onChange={(e) => setGuestName(e.target.value)}
-                placeholder="ex: Sophie Dupont"
-                disabled={isUploading}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none transition disabled:bg-slate-100"
-                required
-              />
-              <p className="text-xs text-slate-500 mt-1">Afin que nous sachions à qui appartiennent les photos</p>
-            </div>
-
-            {/* File Input */}
-            <div>
-              <label className="block mb-3 text-sm font-medium text-slate-900">
-                Sélectionner une ou plusieurs photos
-              </label>
-              <div className="border-2 border-dashed border-slate-300 rounded-lg p-12 text-center hover:border-slate-400 transition cursor-pointer bg-slate-50">
-                <input
-                  id="fileInput"
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleFileChange}
-                  disabled={isUploading}
-                  className="hidden"
-                />
-                <label htmlFor="fileInput" className="cursor-pointer">
-                  <div className="mb-4">
-                    <svg
-                      className="mx-auto w-12 h-12 text-slate-400"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                      />
-                    </svg>
+        {/* Tab: Gallery */}
+        {tab === 'gallery' && (
+          <div className="space-y-6">
+            {/* Gallery Controls */}
+            {photos.length > 0 && (
+              <div className="bg-white rounded-lg border border-slate-200 p-6">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                  {/* Sort Buttons */}
+                  <div className="flex flex-wrap gap-2">
+                    <span className="text-sm font-semibold text-slate-900 self-center">Trier par :</span>
+                    <div className="flex flex-wrap gap-2">
+                      {(['recent', 'old', 'liked', 'name'] as const).map((option) => {
+                        const labels: { [key: string]: string } = {
+                          recent: 'Récent',
+                          old: 'Ancien',
+                          liked: 'Aimées',
+                          name: 'Participant'
+                        };
+                        return (
+                          <button
+                            key={option}
+                            onClick={() => setSortBy(option)}
+                            className={`px-4 py-2 rounded-lg font-medium text-sm transition ${
+                              sortBy === option
+                                ? 'bg-slate-900 text-white'
+                                : 'bg-slate-100 text-slate-900 hover:bg-slate-200'
+                            }`}
+                          >
+                            {labels[option]}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <p className="text-slate-600 font-medium mb-1">
-                    {selectedFiles.length > 0
-                      ? `✓ ${selectedFiles.length} photo(s) sélectionnée(s)`
-                      : 'Cliquez pour sélectionner'}
-                  </p>
-                  <p className="text-slate-500 text-sm">JPG, PNG, WebP (max 50MB par photo)</p>
+
+                  {/* Refresh Button */}
+                  <button
+                    onClick={handleRefresh}
+                    disabled={refreshing}
+                    className="flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-400 text-white text-sm font-semibold rounded-lg transition"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    {refreshing ? 'Actualisation...' : 'Actualiser'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {filteredPhotos.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredPhotos.map((photo, index) => (
+                  <div
+                    key={photo.id}
+                    className="relative bg-white rounded-lg overflow-hidden border border-slate-200 hover:shadow-lg transition group cursor-pointer"
+                    onClick={() => openLightbox(index)}
+                  >
+                    {/* Image */}
+                    <div className="aspect-square bg-slate-100 overflow-hidden relative">
+                      <img
+                        src={`https://ldtxknyhnlijxewqxcpy.supabase.co/storage/v1/object/public/event-photos/${photo.processed_image_path}`}
+                        alt="Photo"
+                        className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                      />
+
+                      {/* Overlay Actions */}
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center gap-4">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleLike(photo.id);
+                          }}
+                          className="bg-white/80 hover:bg-white text-slate-900 p-3 rounded-full transition transform hover:scale-110"
+                          title="Liker"
+                        >
+                          {likedPhotos.has(photo.id) ? '❤️' : '🤍'}
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            copyPhotoLink(photo.id);
+                          }}
+                          className="bg-white/80 hover:bg-white text-slate-900 p-3 rounded-full transition transform hover:scale-110"
+                          title="Copier le lien"
+                        >
+                          🔗
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Info */}
+                    <div className="p-4 space-y-2">
+                      {photo.guest_description && (
+                        <p className="text-slate-900 text-sm line-clamp-2">
+                          {photo.guest_description}
+                        </p>
+                      )}
+                      <p className="text-slate-500 text-xs">
+                        {new Date(photo.created_at).toLocaleDateString('fr-FR', {
+                          weekday: 'short',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })} {photo.guest_name && `par ${photo.guest_name}`}
+                      </p>
+
+                      {/* Likes counter */}
+                      {likedPhotos.has(photo.id) && (
+                        <p className="text-red-600 text-xs font-semibold">
+                          ❤️ Vous aimez cette photo
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-16">
+                <p className="text-slate-600 mb-6">Aucune photo pour le moment</p>
+                <button
+                  onClick={() => setTab('upload')}
+                  className="bg-slate-900 hover:bg-slate-800 text-white font-semibold px-6 py-2 rounded-lg transition"
+                >
+                  Charger les premières photos
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab: Upload */}
+        {tab === 'upload' && (
+          <div className="bg-white rounded-lg border border-slate-200 p-8">
+            <h2 className="text-2xl font-bold text-slate-900 mb-6">Charger vos photos</h2>
+
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Guest Name */}
+              <div>
+                <label className="block text-sm font-semibold text-slate-900 mb-2">
+                  Votre nom/prénom *
                 </label>
+                <input
+                  type="text"
+                  value={guestName}
+                  onChange={(e) => setGuestName(e.target.value)}
+                  placeholder="ex: Sophie Dupont"
+                  disabled={isUploading}
+                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none transition disabled:bg-slate-100 text-sm"
+                  required
+                />
+              </div>
+
+              {/* File Input */}
+              <div>
+                <label className="block text-sm font-semibold text-slate-900 mb-2">
+                  Sélectionner une ou plusieurs photos
+                </label>
+                <div className="border-2 border-dashed border-slate-300 rounded-lg p-12 text-center hover:border-slate-400 transition cursor-pointer bg-slate-50">
+                  <input
+                    id="fileInput"
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleFileChange}
+                    disabled={isUploading}
+                    className="hidden"
+                  />
+                  <label htmlFor="fileInput" className="cursor-pointer">
+                    <div className="mb-4">
+                      <svg
+                        className="mx-auto w-12 h-12 text-slate-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                        />
+                      </svg>
+                    </div>
+                    <p className="text-slate-600 font-medium mb-1">
+                      {selectedFiles.length > 0
+                        ? `✓ ${selectedFiles.length} photo(s) sélectionnée(s)`
+                        : 'Cliquez pour sélectionner'}
+                    </p>
+                    <p className="text-slate-500 text-sm">JPG, PNG, WebP (max 50MB par photo)</p>
+                  </label>
+                </div>
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-semibold text-slate-900 mb-2">
+                  Description (optionnel)
+                </label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Décrivez vos photos..."
+                  maxLength={500}
+                  disabled={isUploading}
+                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none transition resize-none disabled:bg-slate-100 text-sm"
+                  rows={4}
+                />
+                <p className="text-xs text-slate-500 mt-2">{description.length}/500</p>
+              </div>
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={isUploading || selectedFiles.length === 0 || !guestName.trim()}
+                className="w-full bg-slate-900 hover:bg-slate-800 disabled:bg-slate-400 text-white font-semibold py-3 rounded-lg transition duration-200"
+              >
+                {isUploading ? 'Upload en cours...' : 'Uploader les photos'}
+              </button>
+            </form>
+
+            {/* Upload Progress */}
+            {uploadStatuses.length > 0 && (
+              <div className="mt-8 space-y-4">
+                <h3 className="text-lg font-semibold text-slate-900">Progression des uploads</h3>
+
+                {uploadStatuses.map((status, index) => (
+                  <div key={index} className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <p className="text-sm font-medium text-slate-900 truncate">
+                        {status.fileName}
+                      </p>
+                      <span
+                        className={`text-xs font-semibold ${
+                          status.status === 'success'
+                            ? 'text-green-600'
+                            : status.status === 'error'
+                            ? 'text-red-600'
+                            : 'text-blue-600'
+                        }`}
+                      >
+                        {status.status === 'success' && '✓ Succès'}
+                        {status.status === 'loading' && '⏳ Upload...'}
+                        {status.status === 'error' && '✕ Erreur'}
+                      </span>
+                    </div>
+
+                    {status.status === 'loading' && (
+                      <div className="w-full bg-slate-200 rounded-full h-2">
+                        <div
+                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${status.progress}%` }}
+                        />
+                      </div>
+                    )}
+
+                    {status.status === 'success' && (
+                      <div className="w-full bg-green-200 rounded-full h-2">
+                        <div className="bg-green-600 h-2 rounded-full w-full" />
+                      </div>
+                    )}
+
+                    {status.error && (
+                      <div className="bg-red-50 border border-red-200 text-red-900 p-2 rounded text-xs">
+                        {status.error}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Lightbox */}
+      {lightboxOpen && filteredPhotos.length > 0 && (
+        <div
+          className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center"
+          onClick={closeLightbox}
+        >
+          {/* Close Button */}
+          <button
+            onClick={closeLightbox}
+            className="absolute top-4 right-4 text-white text-3xl hover:opacity-70 transition"
+          >
+            ✕
+          </button>
+
+          {/* Navigation Arrows */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              prevPhoto();
+            }}
+            className="absolute left-4 text-white text-4xl hover:opacity-70 transition"
+          >
+            ‹
+          </button>
+
+          {/* Image Container */}
+          <div
+            className="max-w-4xl max-h-[80vh] flex flex-col items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={`https://ldtxknyhnlijxewqxcpy.supabase.co/storage/v1/object/public/event-photos/${filteredPhotos[lightboxIndex].processed_image_path}`}
+              alt="Full view"
+              className="max-h-[70vh] max-w-full object-contain rounded-lg"
+            />
+
+            {/* Photo Info */}
+            <div className="mt-4 text-center">
+              <p className="text-white text-sm">
+                {lightboxIndex + 1} / {filteredPhotos.length}
+              </p>
+              {filteredPhotos[lightboxIndex].guest_name && (
+                <p className="text-gray-300 text-sm mt-2">
+                  par {filteredPhotos[lightboxIndex].guest_name}
+                </p>
+              )}
+              {filteredPhotos[lightboxIndex].guest_description && (
+                <p className="text-gray-300 text-sm mt-2">
+                  {filteredPhotos[lightboxIndex].guest_description}
+                </p>
+              )}
+
+              {/* Lightbox Actions */}
+              <div className="flex gap-4 justify-center mt-4">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleLike(filteredPhotos[lightboxIndex].id);
+                  }}
+                  className="bg-white/20 hover:bg-white/30 text-white p-3 rounded-full transition transform hover:scale-110"
+                >
+                  {likedPhotos.has(filteredPhotos[lightboxIndex].id) ? '❤️' : '🤍'}
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    copyPhotoLink(filteredPhotos[lightboxIndex].id);
+                  }}
+                  className="bg-white/20 hover:bg-white/30 text-white p-3 rounded-full transition transform hover:scale-110"
+                >
+                  🔗
+                </button>
               </div>
             </div>
+          </div>
 
-            {/* Description */}
-            <div>
-              <label className="block mb-3 text-sm font-medium text-slate-900">
-                Description (optionnel)
-              </label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Décrivez vos photos..."
-                maxLength={500}
-                disabled={isUploading}
-                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none transition resize-none disabled:bg-slate-100"
-                rows={4}
-              />
-              <p className="text-xs text-slate-500 mt-2">{description.length}/500</p>
-            </div>
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={isUploading || selectedFiles.length === 0 || !guestName.trim()}
-              className="w-full bg-slate-900 hover:bg-slate-800 disabled:bg-slate-400 text-white font-semibold py-3 rounded-lg transition duration-200"
-            >
-              {isUploading ? 'Upload en cours...' : 'Uploader les photos'}
-            </button>
-          </form>
-
-          {/* Upload Progress */}
-          {uploadStatuses.length > 0 && (
-            <div className="mt-8 space-y-4">
-              <h3 className="text-lg font-semibold text-slate-900">Progression des uploads</h3>
-
-              {uploadStatuses.map((status, index) => (
-                <div key={index} className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <p className="text-sm font-medium text-slate-900 truncate">
-                      {status.fileName}
-                    </p>
-                    <span
-                      className={`text-xs font-semibold ${
-                        status.status === 'success'
-                          ? 'text-green-600'
-                          : status.status === 'error'
-                          ? 'text-red-600'
-                          : 'text-blue-600'
-                      }`}
-                    >
-                      {status.status === 'success' && '✓ Succès'}
-                      {status.status === 'loading' && '⏳ Upload...'}
-                      {status.status === 'error' && '✕ Erreur'}
-                    </span>
-                  </div>
-
-                  {status.status === 'loading' && (
-                    <div className="w-full bg-slate-200 rounded-full h-2">
-                      <div
-                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${status.progress}%` }}
-                      />
-                    </div>
-                  )}
-
-                  {status.status === 'success' && (
-                    <div className="w-full bg-green-200 rounded-full h-2">
-                      <div className="bg-green-600 h-2 rounded-full w-full" />
-                    </div>
-                  )}
-
-                  {status.error && (
-                    <div className="bg-red-50 border border-red-200 text-red-900 p-2 rounded text-xs">
-                      {status.error}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Gallery Link */}
-        <div className="text-center">
-          <Link
-            href={`/gallery?eventSlug=${event.slug}&eventId=${event.eventId}`}
-            className="inline-block bg-slate-100 hover:bg-slate-200 text-slate-900 font-semibold px-8 py-3 rounded-lg transition"
+          {/* Right Arrow */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              nextPhoto();
+            }}
+            className="absolute right-4 text-white text-4xl hover:opacity-70 transition"
           >
-            🖼️ Voir la galerie
-          </Link>
+            ›
+          </button>
         </div>
-      </div>
+      )}
     </div>
   );
 }
