@@ -35,6 +35,27 @@ interface UploadStatus {
 type TabType = 'gallery' | 'upload';
 type SortOption = 'recent' | 'old' | 'liked' | 'name';
 
+// Fonction pour parser la date correctement
+const parseDate = (dateString: string | undefined): Date => {
+  if (!dateString) {
+    return new Date(); // Retour par défaut si undefined/null
+  }
+  
+  // Essayer le format ISO d'abord
+  const date = new Date(dateString);
+  if (!isNaN(date.getTime())) {
+    return date;
+  }
+  
+  // Si ce n'est pas valide, essayer d'autres formats
+  const parts = dateString.split('-');
+  if (parts.length === 3) {
+    return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+  }
+  
+  return new Date(); // Retour par défaut
+};
+
 export default function EventPage() {
   const params = useParams();
   const slug = params.slug as string;
@@ -347,50 +368,44 @@ export default function EventPage() {
       <nav className="bg-white border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-8 py-4">
           <Link href="/">
-            <img src="/images/logo.png" alt="Epik Events" className="h-12 w-auto" />
+            <img src="/images/logo.png" alt="Epik Events" className="h-18 w-auto" />
           </Link>
         </div>
       </nav>
 
-      {/* Event Header */}
+      {/* Event Header - Centered & Large */}
       <div className="bg-white border-b border-slate-200">
-        <div className="max-w-6xl mx-auto px-8 py-12">
-          <h1 className="text-4xl font-bold text-slate-900 mb-2">{event.title}</h1>
-          <p className="text-slate-600 mb-6">{getEventTypeLabel(event.eventType)}</p>
-
-          {/* Event Details */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div className="flex items-center gap-2 text-slate-600">
-              <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              <p>
-                {new Date(event.eventDate).toLocaleDateString('fr-FR', {
-                  weekday: 'long',
-                  year: 'numeric',
+        <div className="max-w-6xl mx-auto px-8 py-16">
+          {/* Centered Content */}
+          <div className="text-center space-y-6 mb-8">
+            <h1 className="text-5xl md:text-6xl font-bold text-slate-900">
+              {event.title}
+            </h1>
+            
+            {/* Date and Location */}
+            <div className="space-y-2">
+              <p className="text-xl text-slate-700 font-medium">
+                Le {parseDate(event.eventDate).toLocaleDateString('fr-FR', {
+                  day: 'numeric',
                   month: 'long',
-                  day: 'numeric'
-                })}
+                  year: 'numeric'
+                })} à {event.location}
               </p>
-            </div>
-            <div className="flex items-center gap-2 text-slate-600">
-              <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              <p>{event.location}</p>
+              <p className="text-slate-600 text-sm uppercase tracking-wide">
+                {getEventTypeLabel(event.eventType)}
+              </p>
             </div>
           </div>
 
           {/* Custom Message */}
           {event.custom_message ? (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-blue-900 text-sm">{event.custom_message}</p>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-2xl mx-auto">
+              <p className="text-blue-900 text-sm text-center">{event.custom_message}</p>
             </div>
           ) : (
-            <div className="bg-slate-50 border border-slate-200 rounded-lg p-6">
-              <p className="text-slate-900 font-medium mb-2">Bienvenue ! 👋</p>
-              <p className="text-slate-600 text-sm">
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-6 max-w-2xl mx-auto">
+              <p className="text-slate-900 font-medium text-center mb-2">Bienvenue ! 👋</p>
+              <p className="text-slate-600 text-sm text-center">
                 Partagez vos photos et vidéos de cet événement. En quelques secondes, elles seront visibles par tous les autres invités.
               </p>
             </div>

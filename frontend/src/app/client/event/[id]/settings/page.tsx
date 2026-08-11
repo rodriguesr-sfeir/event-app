@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import axios from 'axios';
-import JSZip from 'jszip';
 
 interface Event {
   id: string;
@@ -14,6 +13,10 @@ interface Event {
   event_date: string;
   location: string;
   description: string;
+  custom_message?: string;
+  is_public?: boolean;
+  require_approval?: boolean;
+  allow_uploads?: boolean;
 }
 
 interface Photo {
@@ -25,7 +28,7 @@ interface Photo {
   created_at: string;
 }
 
-type TabType = 'infos' | 'qrcode' | 'partage' | 'photos';
+type TabType = 'infos' | 'partage' | 'confidentialite';
 
 export default function EventSettingsPage() {
   const params = useParams();
@@ -34,13 +37,14 @@ export default function EventSettingsPage() {
 
   const [tab, setTab] = useState<TabType>('infos');
   const [event, setEvent] = useState<Event | null>(null);
-  const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
   const [qrCode, setQrCode] = useState('');
   const [clientId, setClientId] = useState('');
-  const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
-  const [downloadingAll, setDownloadingAll] = useState(false);
-  const [approvedPhotos, setApprovedPhotos] = useState<Set<string>>(new Set());
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [saveMessage, setSaveMessage] = useState('');
+
+  // Form state
+  const [formData, setFormData] = useState<Event | null>(null);
 
   useEffect(() => {
     const id = localStorage.getItem('clientId');
@@ -64,15 +68,7 @@ export default function EventSettingsPage() {
         );
         if (foundEvent) {
           setEvent(foundEvent);
-          const photosResponse = await axios.get(
-            `http://localhost:5000/api/guest/${foundEvent.slug}/photos`
-          );
-          if (photosResponse.data.success) {
-            const photoList = photosResponse.data.data || [];
-            setPhotos(photoList);
-            const approved = new Set<string>(photoList.filter((p: Photo) => p.is_visible).map((p: Photo) => p.id));
-            setApprovedPhotos(approved);
-          }
+          setFormData(foundEvent);
         }
       }
     } catch (error) {
@@ -103,63 +99,74 @@ export default function EventSettingsPage() {
     link.click();
   };
 
+  const printQRCode = () => {
+    if (!qrCode) return;
+    const printWindow = window.open();
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>QR Code - ${event?.title}</title>
+            <style>
+              body { display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: white; }
+              img { max-width: 600px; }
+            </style>
+          </head>
+          <body>
+            <img src="${qrCode}" />
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.print();
+    }
+  };
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     alert('✓ Copié !');
   };
 
-  const approvePhoto = async (photoId: string) => {
-    try {
-      await axios.patch(`http://localhost:5000/api/client/photos/${photoId}/approve`);
-      setApprovedPhotos(new Set([...approvedPhotos, photoId]));
-      setPhotos(photos.map(p => p.id === photoId ? { ...p, is_visible: true } : p));
-    } catch (error) {
-      alert('Erreur lors de l\'approbation');
-    }
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => prev ? { ...prev, [name]: value } : null);
   };
 
-  const deletePhoto = async (photoId: string) => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer cette photo ?')) return;
-    setDeletingPhotoId(photoId);
-    try {
-      await axios.patch(`http://localhost:5000/api/client/photos/${photoId}/reject`);
-      setPhotos(photos.filter(p => p.id !== photoId));
-      const newApproved = new Set(approvedPhotos);
-      newApproved.delete(photoId);
-      setApprovedPhotos(newApproved);
-    } catch (error) {
-      alert('Erreur lors de la suppression');
-    } finally {
-      setDeletingPhotoId(null);
-    }
+  const handleToggle = (field: 'is_public' | 'require_approval' | 'allow_uploads') => {
+    setFormData(prev => prev ? { ...prev, [field]: !prev[field] } : null);
   };
 
-  const downloadAllPhotosAsZip = async () => {
-    if (photos.length === 0) return;
-    setDownloadingAll(true);
+  const handleSave = async () => {
+    if (!formData) return;
+
+    setSaveLoading(true);
+    setSaveMessage('');
 
     try {
-      const zip = new JSZip();
-      const folder = zip.folder('photos');
-      if (!folder) return;
+      const response = await axios.patch(
+        `http://localhost:5000/api/client/events/${eventId}/settings`,
+        {
+          title: formData.title,
+          event_type: formData.event_type,
+          event_date: formData.event_date,
+          location: formData.location,
+          description: formData.description,
+          custom_message: formData.custom_message,
+          is_public: formData.is_public,
+          require_approval: formData.require_approval,
+          allow_uploads: formData.allow_uploads
+        }
+      );
 
-      for (let i = 0; i < photos.length; i++) {
-        const photo = photos[i];
-        const imageUrl = `https://ldtxknyhnlijxewqxcpy.supabase.co/storage/v1/object/public/event-photos/${photo.processed_image_path}`;
-        const response = await fetch(imageUrl);
-        const blob = await response.blob();
-        folder.file(`photo-${i + 1}.png`, blob);
+      if (response.data.success) {
+        setSaveMessage('✓ Paramètres enregistrés avec succès');
+        setEvent(response.data.data);
+        setTimeout(() => setSaveMessage(''), 5000);
       }
-
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(zipBlob);
-      link.download = `galerie-${event?.slug}.zip`;
-      link.click();
-    } catch (error) {
-      alert('Erreur lors du téléchargement');
+    } catch (error: any) {
+      setSaveMessage(`❌ Erreur: ${error.response?.data?.error || error.message}`);
     } finally {
-      setDownloadingAll(false);
+      setSaveLoading(false);
     }
   };
 
@@ -171,7 +178,7 @@ export default function EventSettingsPage() {
     );
   }
 
-  if (!event) {
+  if (!event || !formData) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <p className="text-slate-600">Événement non trouvé</p>
@@ -180,7 +187,7 @@ export default function EventSettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 pb-24">
       {/* Navigation */}
       <nav className="bg-white border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-8 py-4 flex justify-between items-center">
@@ -206,228 +213,317 @@ export default function EventSettingsPage() {
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-8 py-12">
+        {/* Save Message */}
+        {saveMessage && (
+          <div className="mb-8">
+            <div className={`p-4 rounded-lg text-center font-semibold text-sm ${
+              saveMessage.includes('✓')
+                ? 'bg-green-50 border border-green-200 text-green-900'
+                : 'bg-red-50 border border-red-200 text-red-900'
+            }`}>
+              {saveMessage}
+            </div>
+          </div>
+        )}
+
         {/* Tabs Navigation */}
         <div className="bg-white rounded-lg border border-slate-200 mb-8 overflow-hidden">
           <div className="flex gap-0">
-            {(['infos', 'qrcode', 'partage', 'photos'] as const).map((tabName) => (
-              <button
-                key={tabName}
-                onClick={() => {
-                  setTab(tabName);
-                  if (tabName === 'qrcode' && !qrCode) {
-                    fetchQRCode();
-                  }
-                }}
-                className={`flex-1 px-6 py-4 text-sm font-medium border-b-2 transition ${
-                  tab === tabName
-                    ? 'border-slate-900 text-slate-900 bg-slate-50'
-                    : 'border-transparent text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                {tabName === 'infos' && '📋 Informations'}
-                {tabName === 'qrcode' && '🎫 QR Code'}
-                {tabName === 'partage' && '🔗 Partage'}
-                {tabName === 'photos' && '📸 Photos'}
-              </button>
-            ))}
+            {(['infos', 'partage', 'confidentialite'] as const).map((tabName) => {
+              const labels: { [key: string]: string } = {
+                infos: '📋 Informations',
+                partage: '🔗 Partage',
+                confidentialite: '🔒 Confidentialité'
+              };
+              return (
+                <button
+                  key={tabName}
+                  onClick={() => {
+                    setTab(tabName);
+                    if (tabName === 'partage' && !qrCode) {
+                      fetchQRCode();
+                    }
+                  }}
+                  className={`flex-1 px-6 py-4 text-sm font-medium border-b-2 transition ${
+                    tab === tabName
+                      ? 'border-slate-900 text-slate-900 bg-slate-50'
+                      : 'border-transparent text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {labels[tabName]}
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* Tab Content */}
-        {/* Infos Tab */}
+        {/* Infos Tab - EDITABLE */}
         {tab === 'infos' && (
           <div className="space-y-8">
             <div className="bg-white rounded-lg border border-slate-200 p-8">
               <h2 className="text-xl font-bold text-slate-900 mb-6">Informations générales</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="space-y-6">
+                {/* Title */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3">
+                  <label className="block text-sm font-semibold text-slate-900 mb-2">
                     Nom de l'événement
                   </label>
-                  <p className="text-lg font-semibold text-slate-900">{event.title}</p>
+                  <input
+                    type="text"
+                    name="title"
+                    value={formData.title}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
+                  />
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3">
-                    Type
-                  </label>
-                  <p className="text-lg font-semibold text-slate-900 capitalize">{event.event_type}</p>
+
+                {/* Type & Date */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-900 mb-2">
+                      Type d'événement
+                    </label>
+                    <select
+                      name="event_type"
+                      value={formData.event_type}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
+                    >
+                      <option value="wedding">Mariage</option>
+                      <option value="birthday">Anniversaire</option>
+                      <option value="corporate">Professionnel</option>
+                      <option value="festival">Festival</option>
+                      <option value="party">Fête</option>
+                      <option value="other">Autre</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-900 mb-2">
+                      Date
+                    </label>
+                    <input
+                      type="date"
+                      name="event_date"
+                      value={formData.event_date}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
+                    />
+                  </div>
                 </div>
+
+                {/* Location */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3">
-                    Date
-                  </label>
-                  <p className="text-lg font-semibold text-slate-900">
-                    {new Date(event.event_date).toLocaleDateString('fr-FR', {
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3">
+                  <label className="block text-sm font-semibold text-slate-900 mb-2">
                     Lieu
                   </label>
-                  <p className="text-lg font-semibold text-slate-900">{event.location}</p>
+                  <input
+                    type="text"
+                    name="location"
+                    value={formData.location}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none text-sm"
+                  />
                 </div>
-              </div>
-              {event.description && (
-                <div className="mt-8 pt-8 border-t border-slate-200">
-                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3">
+
+                {/* Description */}
+                <div>
+                  <label className="block text-sm font-semibold text-slate-900 mb-2">
                     Description
                   </label>
-                  <p className="text-slate-700">{event.description}</p>
+                  <textarea
+                    name="description"
+                    value={formData.description}
+                    onChange={handleInputChange}
+                    rows={4}
+                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none resize-none text-sm"
+                  />
                 </div>
-              )}
+
+                {/* Custom Message */}
+                <div>
+                  <label className="block text-sm font-semibold text-slate-900 mb-2">
+                    Message personnalisé
+                  </label>
+                  <textarea
+                    name="custom_message"
+                    value={formData.custom_message || ''}
+                    onChange={handleInputChange}
+                    rows={3}
+                    placeholder="Affichée à la place du message de bienvenue par défaut"
+                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none resize-none text-sm"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         )}
 
-        {/* QR Code Tab */}
-        {tab === 'qrcode' && (
-          <div className="bg-white rounded-lg border border-slate-200 p-8">
-            <h2 className="text-xl font-bold text-slate-900 mb-8">QR Code</h2>
-            <div className="flex flex-col items-center gap-8">
-              {qrCode ? (
-                <>
-                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-8">
-                    <img src={qrCode} alt="QR Code" className="w-64 h-64" />
-                  </div>
-                  <p className="text-sm text-slate-600 text-center max-w-md">
-                    Partagez ce QR code avec vos invités pour qu'ils accèdent facilement à l'événement.
-                  </p>
-                  <button
-                    onClick={downloadQRCode}
-                    className="bg-slate-900 hover:bg-slate-800 text-white font-semibold px-8 py-3 rounded-lg transition"
-                  >
-                    Télécharger QR Code
-                  </button>
-                </>
-              ) : (
-                <p className="text-slate-600">Chargement du QR Code...</p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Partage Tab */}
+        {/* Partage Tab - QR CODE + URL */}
         {tab === 'partage' && (
           <div className="space-y-6">
+            {/* QR Code Section */}
             <div className="bg-white rounded-lg border border-slate-200 p-8">
-              <h2 className="text-xl font-bold text-slate-900 mb-6">Lien de partage</h2>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-900 mb-3">
-                    URL de l'événement
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={`http://localhost:3000/event/${event.slug}`}
-                      readOnly
-                      className="flex-1 px-4 py-3 border border-slate-300 rounded-lg bg-slate-50 text-slate-900 text-sm"
-                    />
-                    <button
-                      onClick={() =>
-                        copyToClipboard(`http://localhost:3000/event/${event.slug}`)
-                      }
-                      className="bg-slate-900 hover:bg-slate-800 text-white font-semibold px-6 py-3 rounded-lg transition"
-                    >
-                      Copier
-                    </button>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-2">
-                    Partagez ce lien avec vos invités pour qu'ils uploadent leurs photos
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Photos Tab */}
-        {tab === 'photos' && (
-          <div className="space-y-6">
-            <div className="bg-white rounded-lg border border-slate-200 p-8">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold text-slate-900">
-                  Photos ({photos.length})
-                </h2>
-                {photos.length > 0 && (
-                  <button
-                    onClick={downloadAllPhotosAsZip}
-                    disabled={downloadingAll}
-                    className="bg-slate-900 hover:bg-slate-800 disabled:bg-slate-400 text-white font-semibold px-4 py-2 rounded-lg transition text-sm"
-                  >
-                    {downloadingAll ? 'Téléchargement...' : '📥 Exporter tout'}
-                  </button>
-                )}
-              </div>
-
-              {photos.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {photos.map((photo) => (
-                    <div
-                      key={photo.id}
-                      className="border border-slate-200 rounded-lg overflow-hidden hover:shadow-lg transition"
-                    >
-                      <div className="aspect-square bg-slate-100 overflow-hidden">
-                        <img
-                          src={`https://ldtxknyhnlijxewqxcpy.supabase.co/storage/v1/object/public/event-photos/${photo.processed_image_path}`}
-                          alt="Photo"
-                          className="w-full h-full object-cover"
-                        />
+              <h2 className="text-xl font-bold text-slate-900 mb-6">QR Code de l'événement</h2>
+              <p className="text-slate-600 text-sm mb-6">Partagez ce QR code pour permettre à vos invités d'ajouter leurs photos</p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* QR Code Display */}
+                <div className="flex flex-col items-center">
+                  {qrCode ? (
+                    <>
+                      <div className="bg-slate-50 border border-slate-200 rounded-lg p-6 mb-4">
+                        <img src={qrCode} alt="QR Code" className="w-48 h-48" />
                       </div>
-                      <div className="p-4 space-y-3">
-                        {photo.guest_name && (
-                          <p className="text-sm font-medium text-slate-900">
-                            Par {photo.guest_name}
-                          </p>
-                        )}
-                        {photo.guest_description && (
-                          <p className="text-sm text-slate-600 line-clamp-2">
-                            {photo.guest_description}
-                          </p>
-                        )}
-                        <div className="flex items-center gap-2">
-                          {photo.is_visible ? (
-                            <span className="inline-block bg-green-50 text-green-700 text-xs font-semibold px-3 py-1 rounded-full">
-                              ✓ Publiée
-                            </span>
-                          ) : (
-                            <span className="inline-block bg-yellow-50 text-yellow-700 text-xs font-semibold px-3 py-1 rounded-full">
-                              ⏳ En attente
-                            </span>
-                          )}
-                        </div>
-
-                        {!photo.is_visible && (
-                          <button
-                            onClick={() => approvePhoto(photo.id)}
-                            className="w-full bg-green-50 hover:bg-green-100 text-green-700 font-medium py-2 rounded transition text-sm"
-                          >
-                            Approuver
-                          </button>
-                        )}
-
+                      <div className="flex gap-2 w-full">
                         <button
-                          onClick={() => deletePhoto(photo.id)}
-                          disabled={deletingPhotoId === photo.id}
-                          className="w-full bg-red-50 hover:bg-red-100 disabled:bg-slate-200 text-red-700 disabled:text-slate-600 font-medium py-2 rounded transition text-sm"
+                          onClick={downloadQRCode}
+                          className="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-semibold px-4 py-2 rounded-lg transition text-sm"
                         >
-                          {deletingPhotoId === photo.id ? 'Suppression...' : 'Supprimer'}
+                          📥 Télécharger
+                        </button>
+                        <button
+                          onClick={printQRCode}
+                          className="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-semibold px-4 py-2 rounded-lg transition text-sm"
+                        >
+                          🖨️ Imprimer
                         </button>
                       </div>
-                    </div>
-                  ))}
+                    </>
+                  ) : (
+                    <p className="text-slate-600">Chargement du QR Code...</p>
+                  )}
                 </div>
-              ) : (
-                <p className="text-center text-slate-600 py-12">Aucune photo pour le moment</p>
-              )}
+
+                {/* URL Partage */}
+                <div className="flex flex-col justify-center">
+                  <h3 className="text-lg font-semibold text-slate-900 mb-4">Lien de partage</h3>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-900 mb-2">
+                        URL de l'événement
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={`${typeof window !== 'undefined' ? window.location.origin : ''}/event/${event.slug}`}
+                          readOnly
+                          className="flex-1 px-4 py-3 border border-slate-300 rounded-lg bg-slate-50 text-slate-900 text-sm"
+                        />
+                        <button
+                          onClick={() =>
+                            copyToClipboard(`${typeof window !== 'undefined' ? window.location.origin : ''}/event/${event.slug}`)
+                          }
+                          className="bg-slate-900 hover:bg-slate-800 text-white font-semibold px-6 py-3 rounded-lg transition"
+                        >
+                          Copier
+                        </button>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-2">
+                        Partagez ce lien avec vos invités pour qu'ils uploadent leurs photos
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
+
+        {/* Confidentialité Tab */}
+        {tab === 'confidentialite' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg border border-slate-200 p-8">
+              <h2 className="text-xl font-bold text-slate-900 mb-6">Paramètres de confidentialité</h2>
+              
+              <div className="space-y-6">
+                {/* Public/Private */}
+                <div className="flex items-center justify-between p-4 border border-slate-200 rounded-lg">
+                  <div>
+                    <p className="font-semibold text-slate-900">Galerie publique</p>
+                    <p className="text-sm text-slate-600 mt-1">
+                      {formData.is_public
+                        ? 'La galerie est visible par tous'
+                        : 'La galerie n\'est visible que par vous'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleToggle('is_public')}
+                    className={`px-6 py-2 rounded-lg font-semibold transition ${
+                      formData.is_public
+                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    {formData.is_public ? '✓ Publique' : 'Privée'}
+                  </button>
+                </div>
+
+                {/* Require Approval */}
+                <div className="flex items-center justify-between p-4 border border-slate-200 rounded-lg">
+                  <div>
+                    <p className="font-semibold text-slate-900">Approbation des uploads</p>
+                    <p className="text-sm text-slate-600 mt-1">
+                      {formData.require_approval
+                        ? 'Vous devez approuver chaque photo avant publication'
+                        : 'Les photos sont publiées automatiquement'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleToggle('require_approval')}
+                    className={`px-6 py-2 rounded-lg font-semibold transition ${
+                      formData.require_approval
+                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    {formData.require_approval ? '✓ Activée' : 'Désactivée'}
+                  </button>
+                </div>
+
+                {/* Allow Uploads */}
+                <div className="flex items-center justify-between p-4 border border-slate-200 rounded-lg">
+                  <div>
+                    <p className="font-semibold text-slate-900">Téléversement par les invités</p>
+                    <p className="text-sm text-slate-600 mt-1">
+                      {formData.allow_uploads
+                        ? 'Les invités peuvent téléverser des photos'
+                        : 'Seul vous pouvez ajouter des photos'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleToggle('allow_uploads')}
+                    className={`px-6 py-2 rounded-lg font-semibold transition ${
+                      formData.allow_uploads
+                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    {formData.allow_uploads ? '✓ Activé' : 'Désactivé'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Save Button - STICKY */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 p-6">
+        <div className="max-w-7xl mx-auto flex justify-end gap-4">
+          <Link
+            href="/client/dashboard"
+            className="px-6 py-3 border border-slate-300 text-slate-900 font-semibold rounded-lg hover:bg-slate-50 transition"
+          >
+            Annuler
+          </Link>
+          <button
+            onClick={handleSave}
+            disabled={saveLoading}
+            className="px-6 py-3 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-400 text-white font-semibold rounded-lg transition"
+          >
+            {saveLoading ? 'Enregistrement...' : '💾 Enregistrer'}
+          </button>
+        </div>
       </div>
     </div>
   );

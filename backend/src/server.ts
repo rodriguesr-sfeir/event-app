@@ -12,6 +12,7 @@ import publicRouter from './routes/public';
 import clientRouter from './routes/client';
 import eventsRouter from './routes/events';
 import guestRouter from './routes/guest/photos';
+import eventSettingsRouter from './routes/eventSettings';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -32,6 +33,7 @@ app.use('/api/public', publicRouter);
 app.use('/api/client', clientRouter);
 app.use('/api/events', eventsRouter);
 app.use('/api/guest', guestRouter);
+app.use('/api/client/events', eventSettingsRouter);
 
 // Health check
 app.get('/health', (req, res) => {
