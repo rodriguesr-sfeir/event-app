@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import axios from 'axios';
+import Header from '@/components/Header';
 
 interface Event {
   eventId: string;
@@ -343,20 +344,26 @@ export default function EventPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <p className="text-slate-600">Chargement de l'événement...</p>
+      <div className="min-h-screen bg-slate-50">
+        <Header showNavigation={true} showLogout={false} />
+        <div className="flex items-center justify-center min-h-[400px]">
+          <p className="text-slate-600">Chargement de l'événement...</p>
+        </div>
       </div>
     );
   }
 
   if (error || !event) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-slate-600 mb-4">❌ {error || 'Événement non trouvé'}</p>
-          <Link href="/" className="text-slate-900 font-semibold hover:underline">
-            Retour à l'accueil
-          </Link>
+      <div className="min-h-screen bg-slate-50">
+        <Header showNavigation={true} showLogout={false} />
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <p className="text-slate-600 mb-4">❌ {error || 'Événement non trouvé'}</p>
+            <Link href="/" className="text-slate-900 font-semibold hover:underline">
+              Retour à l'accueil
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -364,18 +371,12 @@ export default function EventPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Navigation */}
-      <nav className="bg-white border-b border-slate-200">
-        <div className="max-w-6xl mx-auto px-8 py-4">
-          <Link href="/">
-            <img src="/images/logo.png" alt="Epik Events" className="h-18 w-auto" />
-          </Link>
-        </div>
-      </nav>
+      {/* Header Unifié */}
+      <Header showNavigation={true} showLogout={false} />
 
       {/* Event Header - Centered & Large */}
       <div className="bg-white border-b border-slate-200">
-        <div className="max-w-6xl mx-auto px-8 py-16">
+        <div className="max-w-7xl mx-auto px-6 py-16">
           {/* Centered Content */}
           <div className="text-center space-y-6 mb-8">
             <h1 className="text-5xl md:text-6xl font-bold text-slate-900">
@@ -414,7 +415,7 @@ export default function EventPage() {
       </div>
 
       {/* Content */}
-      <div className="max-w-6xl mx-auto px-8 py-8">
+      <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Tab Navigation */}
         <div className="bg-white rounded-lg border border-slate-200 mb-8 overflow-hidden">
           <div className="flex gap-0">

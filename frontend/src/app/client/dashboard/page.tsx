@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import axios from 'axios';
+import Header from '@/components/Header';
 
 interface Event {
   id: string;
@@ -68,14 +69,6 @@ export default function ClientDashboard() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('clientToken');
-    localStorage.removeItem('clientId');
-    localStorage.removeItem('clientEmail');
-    localStorage.removeItem('clientName');
-    router.push('/');
-  };
-
   const handleDeleteEvent = async (eventId: string) => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cet événement ?')) {
       return;
@@ -112,37 +105,18 @@ export default function ClientDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* Navigation */}
-      <nav className="bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-          <img src="/images/logo.png" alt="Epik Events" className="h-18 w-auto" />
-          <div className="flex items-center gap-6">
-            <span className="text-slate-600 text-sm">{clientEmail}</span>
-            <button
-              onClick={handleLogout}
-              className="text-slate-600 hover:text-slate-900 font-medium transition"
-            >
-              Déconnexion
-            </button>
-          </div>
-        </div>
-      </nav>
-
-      {/* Header */}
-      <div className="bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-6 py-8 flex justify-between items-start">
-          <div>
-            <h1 className="text-4xl font-bold text-slate-900 mb-1">Tableau de bord</h1>
-            <p className="text-slate-600">Bienvenue, {userName}</p>
-          </div>
-          <Link
-            href="/client/create-event"
-            className="bg-slate-900 hover:bg-slate-800 text-white font-semibold px-6 py-2 rounded-lg transition"
-          >
-            + Nouvel événement
-          </Link>
-        </div>
-      </div>
+      {/* Header Réutilisable */}
+      <Header
+        showNavigation={true}
+        clientEmail={clientEmail}
+        showLogout={true}
+        title="Tableau de bord"
+        subtitle={`Bienvenue, ${userName}`}
+        action={{
+          label: '+ Nouvel événement',
+          href: '/client/create-event'
+        }}
+      />
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-6 py-8">
@@ -179,18 +153,17 @@ export default function ClientDashboard() {
               </div>
 
               {/* Participants */}
-
-<div className="bg-white rounded-lg border border-slate-200 p-6">
-  <div className="flex items-center justify-between mb-4">
-    <p className="text-slate-600 font-medium">Participants</p>
-    <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <circle cx="12" cy="8" r="4" strokeWidth={1.5} />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 20c0-3.314 2.687-6 6-6s6 2.686 6 6" />
-    </svg>
-  </div>
-  <p className="text-3xl font-bold text-slate-900">{stats.participantCount}</p>
-  <p className="text-slate-500 text-sm mt-1">Nombre de contributeur(s)</p>
-</div>
+              <div className="bg-white rounded-lg border border-slate-200 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-slate-600 font-medium">Participants</p>
+                  <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <circle cx="12" cy="8" r="4" strokeWidth={1.5} />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 20c0-3.314 2.687-6 6-6s6 2.686 6 6" />
+                  </svg>
+                </div>
+                <p className="text-3xl font-bold text-slate-900">{stats.participantCount}</p>
+                <p className="text-slate-500 text-sm mt-1">Nombre de contributeur(s)</p>
+              </div>
 
               {/* This Month */}
               <div className="bg-white rounded-lg border border-slate-200 p-6">

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import axios from 'axios';
+import Header from '@/components/Header';
 
 interface Event {
   id: string;
@@ -19,15 +20,6 @@ interface Event {
   allow_uploads?: boolean;
 }
 
-interface Photo {
-  id: string;
-  guest_name: string;
-  guest_description: string;
-  processed_image_path: string;
-  is_visible: boolean;
-  created_at: string;
-}
-
 type TabType = 'infos' | 'partage' | 'confidentialite';
 
 export default function EventSettingsPage() {
@@ -40,6 +32,7 @@ export default function EventSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [qrCode, setQrCode] = useState('');
   const [clientId, setClientId] = useState('');
+  const [clientEmail, setClientEmail] = useState('');
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
 
@@ -48,10 +41,12 @@ export default function EventSettingsPage() {
 
   useEffect(() => {
     const id = localStorage.getItem('clientId');
+    const email = localStorage.getItem('clientEmail');
     if (!id) {
       router.push('/');
     } else {
       setClientId(id);
+      setClientEmail(email || '');
       fetchEventData(id);
     }
   }, [router]);
@@ -172,47 +167,47 @@ export default function EventSettingsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <p className="text-slate-600">Chargement...</p>
+      <div className="min-h-screen bg-slate-50">
+        <Header
+          showNavigation={true}
+          clientEmail={clientEmail}
+          showLogout={true}
+        />
+        <div className="flex items-center justify-center min-h-[400px]">
+          <p className="text-slate-600">Chargement...</p>
+        </div>
       </div>
     );
   }
 
   if (!event || !formData) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <p className="text-slate-600">Événement non trouvé</p>
+      <div className="min-h-screen bg-slate-50">
+        <Header
+          showNavigation={true}
+          clientEmail={clientEmail}
+          showLogout={true}
+        />
+        <div className="flex items-center justify-center min-h-[400px]">
+          <p className="text-slate-600">Événement non trouvé</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-slate-50 pb-24">
-      {/* Navigation */}
-      <nav className="bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-8 py-4 flex justify-between items-center">
-          <Link href="/client/dashboard">
-            <img src="/images/logo.png" alt="Epik Events" className="h-18 w-auto" />
-          </Link>
-          <Link
-            href="/client/dashboard"
-            className="text-slate-600 hover:text-slate-900 text-sm font-medium transition"
-          >
-            ← Retour au dashboard
-          </Link>
-        </div>
-      </nav>
-
-      {/* Header */}
-      <div className="bg-white border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-8 py-8">
-          <h1 className="text-4xl font-bold text-slate-900 mb-1">{event.title}</h1>
-          <p className="text-slate-600 text-sm">Paramètres de l'événement</p>
-        </div>
-      </div>
+      {/* Header Réutilisable */}
+      <Header
+        showNavigation={true}
+        clientEmail={clientEmail}
+        showLogout={true}
+        title={event.title}
+        subtitle="Paramètres de l'événement"
+      />
 
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-8 py-12">
+      <div className="max-w-7xl mx-auto px-6 py-12">
         {/* Save Message */}
         {saveMessage && (
           <div className="mb-8">
@@ -361,7 +356,6 @@ export default function EventSettingsPage() {
         {/* Partage Tab - QR CODE + URL */}
         {tab === 'partage' && (
           <div className="space-y-6">
-            {/* QR Code Section */}
             <div className="bg-white rounded-lg border border-slate-200 p-8">
               <h2 className="text-xl font-bold text-slate-900 mb-6">QR Code de l'événement</h2>
               <p className="text-slate-600 text-sm mb-6">Partagez ce QR code pour permettre à vos invités d'ajouter leurs photos</p>
