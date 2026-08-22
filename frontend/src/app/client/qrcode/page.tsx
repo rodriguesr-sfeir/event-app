@@ -1,6 +1,6 @@
 'use client';
 
-export const dynamic = 'force-dynamic';  // ← AJOUTER CETTE LIGNE
+export const revalidate = 0;  // ← Ou celle-ci
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
