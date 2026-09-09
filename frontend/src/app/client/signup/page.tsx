@@ -26,7 +26,15 @@ export default function SignupPage() {
       if (!fullName.trim()) {
         setError('Le nom complet est requis');
         setLoading(false);
-        return;
+      return;
+    }
+
+    // Vérifier qu'il y a au moins un espace (prénom ET nom)
+    const parts = fullName.trim().split(' ');
+      if (parts.length < 2) {
+        setError('Veuillez entrer votre prénom ET votre nom');
+        setLoading(false);
+      return;
       }
 
       if (!email.trim()) {
@@ -42,7 +50,7 @@ export default function SignupPage() {
       }
 
       // Diviser le nom complet en prénom et nom
-      const parts = fullName.trim().split(' ');
+      //const parts = fullName.trim().split(' ');
       const firstName = parts[0] || '';
       const lastName = parts.slice(1).join(' ') || '';
 
