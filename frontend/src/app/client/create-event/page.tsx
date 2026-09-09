@@ -79,7 +79,7 @@ export default function CreateEventPage() {
 
       // Envoyer les données au backend
       const response = await axios.post(
-        '${process.env.NEXT_PUBLIC_API_URL}/api/client/events',
+        `${process.env.NEXT_PUBLIC_API_URL}/api/client/events`, 
         {
           title: formData.title,
           event_type: formData.event_type,
