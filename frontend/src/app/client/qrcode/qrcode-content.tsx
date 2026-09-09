@@ -37,7 +37,7 @@ export default function QRCodeContent() {
   const fetchQRCode = async (id: string) => {
     try {
       const response = await axios.get(
-        `http://localhost:5000/api/client/events/${id}/qrcode`
+        `${process.env.NEXT_PUBLIC_API_URL}/api/client/events/${id}/qrcode`
       );
 
       if (response.data.success) {

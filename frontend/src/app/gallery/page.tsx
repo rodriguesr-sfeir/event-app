@@ -103,7 +103,7 @@ export default function Gallery() {
   const fetchPhotos = async (id: string, slug: string) => {
     try {
       const response = await axios.get(
-        `http://localhost:5000/api/guest/${slug}/photos`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/guest/${slug}/photos`,
         { params: { eventId: id } }
       );
 
@@ -208,7 +208,7 @@ export default function Gallery() {
     setDeletingId(photoId);
     try {
       const response = await axios.patch(
-        `http://localhost:5000/api/client/photos/${photoId}/reject`
+        `${process.env.NEXT_PUBLIC_API_URL}/api/client/photos/${photoId}/reject`
       );
 
       if (response.data.success) {

@@ -58,7 +58,7 @@ export default function ClientDashboard() {
 
   const fetchEventsWithStats = async (userId: string) => {
     try {
-      const response = await axios.get(`http://localhost:5000/api/events/${userId}`);
+      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/events/${userId}`);
 
       if (response.data.success) {
         setEvents(response.data.data.events);
@@ -78,7 +78,7 @@ export default function ClientDashboard() {
 
     setDeletingId(eventId);
     try {
-      const response = await axios.delete(`http://localhost:5000/api/events/${eventId}`);
+      const response = await axios.delete(`${process.env.NEXT_PUBLIC_API_URL}/api/events/${eventId}`);
 
       if (response.data.success) {
         setEvents(events.filter(e => e.id !== eventId));
@@ -310,3 +310,4 @@ export default function ClientDashboard() {
     </div>
   );
 }
+

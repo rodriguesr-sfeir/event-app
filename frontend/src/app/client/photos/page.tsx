@@ -33,7 +33,7 @@ export default function ClientPhotosPage() {
   const fetchPhotos = async (userId: string) => {
     try {
       const response = await axios.get(
-        `http://localhost:5000/api/client/photos/${userId}`
+        `${process.env.NEXT_PUBLIC_API_URL}/api/client/photos/${userId}`
       );
 
       if (response.data.success) {
@@ -53,7 +53,7 @@ export default function ClientPhotosPage() {
   const approvePhoto = async (photoId: string) => {
     try {
       const response = await axios.patch(
-        `http://localhost:5000/api/client/photos/${photoId}/approve`
+        `${process.env.NEXT_PUBLIC_API_URL}/api/client/photos/${photoId}/approve`
       );
 
       if (response.data.success) {
@@ -76,7 +76,7 @@ export default function ClientPhotosPage() {
 
     try {
       const response = await axios.patch(
-        `http://localhost:5000/api/client/photos/${photoId}/reject`
+        `${process.env.NEXT_PUBLIC_API_URL}/api/client/photos/${photoId}/reject`
       );
 
       if (response.data.success) {

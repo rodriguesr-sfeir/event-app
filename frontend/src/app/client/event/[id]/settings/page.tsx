@@ -56,7 +56,7 @@ export default function EventSettingsPage() {
   const fetchEventData = async (userId: string) => {
     try {
       const eventResponse = await axios.get(
-        `http://localhost:5000/api/events/${userId}`
+        `${process.env.NEXT_PUBLIC_API_URL}/api/events/${userId}`
       );
 
       if (eventResponse.data.success) {
@@ -78,7 +78,7 @@ export default function EventSettingsPage() {
   const fetchQRCode = async () => {
     try {
       const response = await axios.get(
-        `http://localhost:5000/api/client/events/${eventId}/qrcode`
+        `${process.env.NEXT_PUBLIC_API_URL}/api/client/events/${eventId}/qrcode`
       );
       if (response.data.success) {
         setQrCode(response.data.data.qrCode);
@@ -141,7 +141,7 @@ export default function EventSettingsPage() {
 
     try {
       const response = await axios.patch(
-        `http://localhost:5000/api/client/events/${eventId}/settings`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/client/events/${eventId}/settings`,
         {
           title: formData.title,
           event_type: formData.event_type,

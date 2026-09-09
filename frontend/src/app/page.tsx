@@ -31,7 +31,7 @@ export default function Home() {
         ? { email, password }
         : { email, password, full_name: fullName };
 
-      const response = await axios.post(`http://localhost:5000${endpoint}`, payload);
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}${endpoint}`, payload);
 
       if (response.data.success) {
         localStorage.setItem('clientToken', response.data.data.token);

@@ -87,7 +87,7 @@ export default function UploadContent() {
         formData.append('description', i === 0 ? description : '');
 
         const response = await axios.post(
-          `http://localhost:5000/api/guest/${eventSlug}/photos`,
+          `${process.env.NEXT_PUBLIC_API_URL}/api/guest/${eventSlug}/photos`,
           formData,
           { headers: { 'Content-Type': 'multipart/form-data' } }
         );
@@ -355,3 +355,4 @@ export default function UploadContent() {
     </div>
   );
 }
+

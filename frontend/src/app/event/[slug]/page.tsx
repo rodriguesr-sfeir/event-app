@@ -94,7 +94,7 @@ export default function EventPage() {
   const fetchEvent = async (eventSlug: string) => {
     try {
       const response = await axios.get(
-        `http://localhost:5000/api/public/events/${eventSlug}`
+        `${process.env.NEXT_PUBLIC_API_URL}/api/public/events/${eventSlug}`
       );
 
       if (response.data.success) {
@@ -115,7 +115,7 @@ export default function EventPage() {
   const fetchPhotos = async (eventSlug: string) => {
     try {
       const response = await axios.get(
-        `http://localhost:5000/api/guest/${eventSlug}/photos`
+        `${process.env.NEXT_PUBLIC_API_URL}/api/guest/${eventSlug}/photos`
       );
 
       if (response.data.success) {
@@ -232,7 +232,7 @@ export default function EventPage() {
         formData.append('guest_name', guestName);
 
         const response = await axios.post(
-          `http://localhost:5000/api/guest/${event?.slug}/photos`,
+          `${process.env.NEXT_PUBLIC_API_URL}/api/guest/${event?.slug}/photos`,
           formData,
           { headers: { 'Content-Type': 'multipart/form-data' } }
         );
