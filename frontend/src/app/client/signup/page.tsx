@@ -8,8 +8,6 @@ import axios from 'axios';
 export default function SignupPage() {
   const router = useRouter();
   const [fullName, setFullName] = useState('');
-  //const [fullName, setfullName] = useState('');
-  //const [fullName, setfullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -84,7 +82,7 @@ export default function SignupPage() {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Prénom */}
+            {/* Nom Prénom */}
             <div>
               <label className="block text-sm font-semibold text-slate-900 mb-2">
                 Prénom
@@ -94,21 +92,6 @@ export default function SignupPage() {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Sophie"
-                required
-                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none transition text-sm"
-              />
-            </div>
-
-            {/* Nom */}
-            <div>
-              <label className="block text-sm font-semibold text-slate-900 mb-2">
-                Nom
-              </label>
-              <input
-                type="text"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="Dupont"
                 required
                 className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none transition text-sm"
               />
