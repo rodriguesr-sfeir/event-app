@@ -7,8 +7,9 @@ import axios from 'axios';
 
 export default function SignupPage() {
   const router = useRouter();
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  const [fullName, setFullName] = useState('');
+  //const [firstName, setFirstName] = useState('');
+  //const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -21,8 +22,8 @@ export default function SignupPage() {
     setError('');
 
     try {
-      if (!firstName.trim() || !lastName.trim()) {
-        setError('Prénom et nom sont requis');
+      if (!fullName.trim()) {
+        setError('Le nom complet est requis');
         setLoading(false);
         return;
       }
@@ -33,9 +34,14 @@ export default function SignupPage() {
         return;
       }
 
+      // Diviser fullName en first_name et last_name
+      const parts = fullName.trim().split(' ');
+      const first_name = parts[0] || '';
+      const last_name = parts.slice(1).join(' ') || '';
+
       const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/register`, {
-        first_name: firstName,
-        last_name: lastName,
+        first_name,
+        last_name,
         email,
         password
       });
@@ -85,8 +91,8 @@ export default function SignupPage() {
               </label>
               <input
                 type="text"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
                 placeholder="Sophie"
                 required
                 className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none transition text-sm"
@@ -100,8 +106,8 @@ export default function SignupPage() {
               </label>
               <input
                 type="text"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
                 placeholder="Dupont"
                 required
                 className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none transition text-sm"
