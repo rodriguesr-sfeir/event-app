@@ -33,7 +33,7 @@ export default function SignupPage() {
         return;
       }
 
-      const response = await axios.post('${process.env.NEXT_PUBLIC_API_URL}/api/auth/register', {
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/register`, {
         first_name: firstName,
         last_name: lastName,
         email,
