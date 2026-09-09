@@ -7,6 +7,8 @@ import axios from 'axios';
 
 export default function SignupPage() {
   const router = useRouter();
+  
+  // UN SEUL state pour le nom complet
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -20,8 +22,15 @@ export default function SignupPage() {
     setError('');
 
     try {
+      // Vérifications
       if (!fullName.trim()) {
         setError('Le nom complet est requis');
+        setLoading(false);
+        return;
+      }
+
+      if (!email.trim()) {
+        setError('L\'email est requis');
         setLoading(false);
         return;
       }
@@ -32,29 +41,40 @@ export default function SignupPage() {
         return;
       }
 
-      // Diviser fullName en first_name et last_name
+      // Diviser le nom complet en prénom et nom
       const parts = fullName.trim().split(' ');
-      const first_name = parts[0] || '';
-      const last_name = parts.slice(1).join(' ') || '';
+      const firstName = parts[0] || '';
+      const lastName = parts.slice(1).join(' ') || '';
 
-      const response = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/register`, {
-        first_name,
-        last_name,
-        email,
-        password
-      });
+      // Appeler l'API backend
+      const response = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/auth/register`,
+        {
+          first_name: firstName,
+          last_name: lastName,
+          email: email,
+          password: password
+        }
+      );
 
       if (response.data.success) {
+        // Sauvegarder les infos de l'utilisateur
         localStorage.setItem('clientToken', response.data.data.token);
         localStorage.setItem('clientId', response.data.data.userId);
         localStorage.setItem('clientEmail', response.data.data.email);
-        localStorage.setItem('clientName', `${response.data.data.first_name} ${response.data.data.last_name}`);
+        localStorage.setItem(
+          'clientName',
+          `${response.data.data.first_name} ${response.data.data.last_name}`
+        );
+        
+        // Rediriger au dashboard
         router.push('/client/dashboard');
       } else {
         setError(response.data.error || 'Erreur lors de l\'inscription');
       }
     } catch (err: any) {
       setError(err.response?.data?.error || 'Erreur serveur');
+      console.error('Erreur:', err);
     } finally {
       setLoading(false);
     }
@@ -82,16 +102,16 @@ export default function SignupPage() {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Nom Prénom */}
+            {/* Nom complet - UN SEUL champ */}
             <div>
               <label className="block text-sm font-semibold text-slate-900 mb-2">
-                Prénom
+                Nom complet
               </label>
               <input
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="Sophie"
+                placeholder="Jean Dupont"
                 required
                 className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-slate-900 focus:border-transparent outline-none transition text-sm"
               />
@@ -142,14 +162,14 @@ export default function SignupPage() {
               />
             </div>
 
-            {/* Error */}
+            {/* Error Message */}
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg text-sm">
                 {error}
               </div>
             )}
 
-            {/* Submit */}
+            {/* Submit Button */}
             <button
               type="submit"
               disabled={loading}
