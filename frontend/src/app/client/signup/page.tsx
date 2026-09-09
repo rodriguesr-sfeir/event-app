@@ -8,8 +8,8 @@ import axios from 'axios';
 export default function SignupPage() {
   const router = useRouter();
   const [fullName, setFullName] = useState('');
-  //const [firstName, setFirstName] = useState('');
-  //const [lastName, setLastName] = useState('');
+  //const [fullName, setfullName] = useState('');
+  //const [fullName, setfullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
