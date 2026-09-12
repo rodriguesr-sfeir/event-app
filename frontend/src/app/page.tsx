@@ -12,7 +12,7 @@ export default function HomePage() {
       <nav className="fixed top-0 w-full bg-white/80 backdrop-blur-md z-50 border-b border-slate-100">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <Link href="/" className="flex items-center gap-2">
-            <img src="/images/logo.png" alt="Epik Events" className="h-10 w-auto" />
+            <img src="/images/logo.png" alt="Epik Events" className="h-18 w-auto" />
           </Link>
           <div className="flex gap-4">
             <Link
