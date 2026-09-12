@@ -46,16 +46,16 @@ export default function HomePage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
-              href="/client/signup"
-              className="px-8 py-4 bg-slate-900 text-white font-semibold rounded-lg hover:bg-slate-800 transition text-lg"
-            >
-              Commencer gratuitement
-            </Link>
-            <Link
               href="/client/login"
               className="px-8 py-4 border-2 border-slate-900 text-slate-900 font-semibold rounded-lg hover:bg-slate-50 transition text-lg"
             >
-              Se connecter
+              Connexion
+            </Link>
+            <Link
+              href="/client/signup"
+              className="px-8 py-4 bg-slate-900 text-white font-semibold rounded-lg hover:bg-slate-800 transition text-lg"
+            >
+              Commencer
             </Link>
           </div>
         </div>
@@ -192,16 +192,16 @@ export default function HomePage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
-              href="/client/signup"
-              className="px-8 py-4 bg-white text-slate-900 font-semibold rounded-lg hover:bg-slate-100 transition text-lg"
-            >
-              Commencer gratuitement
-            </Link>
-            <Link
               href="/client/login"
               className="px-8 py-4 border-2 border-white text-white font-semibold rounded-lg hover:bg-slate-800 transition text-lg"
             >
-              Se connecter
+              Connexion
+            </Link>
+            <Link
+              href="/client/signup"
+              className="px-8 py-4 bg-white text-slate-900 font-semibold rounded-lg hover:bg-slate-100 transition text-lg"
+            >
+              Commencer
             </Link>
           </div>
         </div>
